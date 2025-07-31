@@ -8,9 +8,12 @@ const tintColorDark = "#fff";
 
 const common = {
   PRIMARY_COLOR: "#359D66",
+  UNCHANGED_WHITE: "#FFF",
+  UNCHANGED_BLACK: "#000",
 };
 
 export const colors = {
+  ...common,
   light: {
     text: "#11181C",
     background: "#fff",
