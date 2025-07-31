@@ -60,6 +60,8 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     flexDirection: "row",
     justifyContent: "center",
+    height: 50,
+    // width: Dimensions.get("screen").width - 32,
   },
   inValid: {
     opacity: 0.5,
