@@ -8,16 +8,15 @@ import {
   Dimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { router, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 const { width, height } = Dimensions.get("window");
 
 export default function AuthHomeScreen() {
-  const router = useRouter();
-
   const handleKakaoLogin = () => {
     console.log("카카오 로그인 시작");
+    router.replace("/auth/travelform");
   };
 
   return (
@@ -38,20 +37,15 @@ export default function AuthHomeScreen() {
       end={{ x: 0.5, y: 1 }}
     >
       <SafeAreaView style={styles.safeArea}>
-        {/* 로고 */}
         <Image
           source={require("@/assets/images/WitLogoWhite.png")}
           style={styles.logo}
           resizeMode="contain"
         />
-
-        {/* 안내 문구 */}
         <Text style={styles.title}>
           위트와 함께{"\n"}
           여행할 준비가 되셨나요?
         </Text>
-
-        {/* 카카오 로그인 버튼 */}
         <Pressable style={styles.kakaoButton} onPress={handleKakaoLogin}>
           <Ionicons name="chatbubble-sharp" color={"#181500"} size={20} />
           <Text style={styles.kakaoText}>카카오톡으로 시작하기</Text>
