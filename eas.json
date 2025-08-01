@@ -20,9 +20,8 @@
   },
   "submit": {
     "production": {
-      "appleAppSpecificPassword": "$APPLE_APP_SPECIFIC_PASSWORD",
       "ios": {
-        "appleAppSpecificPassword": "$APPLE_APP_SPECIFIC_PASSWORD"
+        "appleId": "kjh002899@gmail.com"
       }
     }
   }
