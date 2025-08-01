@@ -5,6 +5,7 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { useEffect } from "react";
 import "react-native-reanimated";
+import Toast from "react-native-toast-message";
 
 export default function RootLayout() {
   const [loaded] = useFonts({
@@ -19,6 +20,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <RootNavigator />
+      <Toast />
     </QueryClientProvider>
   );
 }
@@ -26,12 +28,27 @@ export default function RootLayout() {
 function RootNavigator() {
   const { auth } = useAuth();
 
-  useEffect(() => {}, [auth.id]);
+  useEffect(() => {
+    auth.id &&
+      Toast.show({
+        type: "success",
+        text1: `환영합니다! ${auth.nickname || "회원"}님!`,
+        position: "top",
+        visibilityTime: 2500,
+      });
+  }, [auth.id]);
   //auth값에 따른 분기점 설정 필요함
   return (
-    <Stack>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="auth" options={{ headerShown: false }} />
+    <Stack
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      {auth.id ? (
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      ) : (
+        <Stack.Screen name="auth" options={{ headerShown: false }} />
+      )}
       <Stack.Screen name="+not-found" />
     </Stack>
   );
