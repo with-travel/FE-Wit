@@ -12,6 +12,12 @@ import TravelQ4, { ImportantType } from "@/components/travelQuestions/TravelQ4";
 import TravelQ5 from "@/components/travelQuestions/TravelQ5";
 import { colors } from "@/constants/colors";
 
+// **1**: React Hook Form import
+import { useForm, SubmitHandler } from "react-hook-form";
+// **2**: API 요청용 라이브러리 (원하는 것으로 교체)
+import axios from "axios";
+import Toast from "react-native-toast-message";
+
 type TravelFormType = {
   travelType: TravelType;
   myCharacter: CharacterType;
@@ -21,95 +27,123 @@ type TravelFormType = {
 };
 
 export default function TravelFormScreen() {
-  const totalPage = 5;
   const pagerRef = useRef<PagerView>(null);
-
+  const totalPage = 5;
   const [pageIndex, setPageIndex] = useState(0);
-  const [form, setForm] = useState<TravelFormType>({
-    travelType: "" as TravelType,
-    myCharacter: "" as CharacterType,
-    preferType: "" as StyleType,
-    importantThings: [],
-    selfIntroduce: "",
+
+  const {
+    watch,
+    setValue,
+    handleSubmit,
+    formState: { isValid },
+  } = useForm<TravelFormType>({
+    mode: "onChange",
+    defaultValues: {
+      travelType: "" as TravelType,
+      myCharacter: "" as CharacterType,
+      preferType: "" as StyleType,
+      importantThings: [] as ImportantType[],
+      selfIntroduce: "",
+    },
   });
 
-  const isValid = () => {
+  const isStepValid = () => {
     switch (pageIndex) {
       case 0:
-        return form.travelType !== "";
+        return watch("travelType") !== "";
       case 1:
-        return form.myCharacter !== "";
+        return watch("myCharacter") !== "";
       case 2:
-        return form.preferType !== "";
+        return watch("preferType") !== "";
       case 3:
-        return form.importantThings.length > 0;
+        return watch("importantThings").length > 0;
       case 4:
-        return form.selfIntroduce.trim().length > 0;
+        return watch("selfIntroduce").trim().length > 0;
       default:
         return false;
     }
   };
 
+  const onSubmit: SubmitHandler<TravelFormType> = async (data) => {
+    console.log("data", data);
+    try {
+      await axios.post("https://your.api/travel-form", data);
+      Toast.show({
+        position: "top",
+        text1: "회원가입 절차가 완료되었습니다.",
+        type: "success",
+      });
+      router.replace("/");
+    } catch (error) {
+      Toast.show({
+        position: "top",
+        text1: "데이터 전송에 실패했습니다. 다시 시도해주세요.",
+        type: "error",
+      });
+      console.error("서버 전송 에러:", error);
+    }
+  };
+
+  // **6**: 다음 페이지로 이동 or 최종 제출
   const goNext = () => {
     if (pageIndex < totalPage - 1) {
       const next = pageIndex + 1;
       pagerRef.current?.setPage(next);
       setPageIndex(next);
     } else {
-      console.log("제출 데이터:", form);
-      router.replace("/");
+      // 마지막 단계, handleSubmit 호출
+      handleSubmit(onSubmit)();
     }
   };
 
   const pages = [
     <TravelQ1
       key="q1"
-      selected={form.travelType}
-      onSelect={(v) => setForm((f) => ({ ...f, travelType: v }))}
+      selected={watch("travelType")}
+      onSelect={(v) => setValue("travelType", v, { shouldValidate: true })}
     />,
     <TravelQ2
       key="q2"
-      selected={form.myCharacter}
-      onSelect={(v) => setForm((f) => ({ ...f, myCharacter: v }))}
+      selected={watch("myCharacter")}
+      onSelect={(v) => setValue("myCharacter", v, { shouldValidate: true })}
     />,
     <TravelQ3
       key="q3"
       questionIndex={3}
       questionText={`선호하는 여행 스타일은\n무엇인가요?`}
-      selected={form.preferType}
-      onSelect={(v) => setForm((f) => ({ ...f, preferType: v }))}
+      selected={watch("preferType")}
+      onSelect={(v) => setValue("preferType", v, { shouldValidate: true })}
     />,
     <TravelQ4
       key="q4"
       questionIndex={4}
       questionText={`여행에서 제일 중요하게\n생각하는 것은 무엇인가요?`}
-      selected={form.importantThings}
-      onSelect={(v) =>
-        setForm((f) => {
-          const next = f.importantThings.includes(v)
-            ? f.importantThings.filter((i) => i !== v)
-            : [...f.importantThings, v];
-          return { ...f, importantThings: next };
-        })
-      }
+      selected={watch("importantThings")}
+      onSelect={(v) => {
+        const arr = watch("importantThings");
+        const next = arr.includes(v) ? arr.filter((i) => i !== v) : [...arr, v];
+        setValue("importantThings", next, { shouldValidate: true });
+      }}
     />,
     <TravelQ5
       key="q5"
-      value={form.selfIntroduce}
-      onChange={(t) => setForm((f) => ({ ...f, selfIntroduce: t }))}
+      value={watch("selfIntroduce")}
+      onChange={(t) => setValue("selfIntroduce", t, { shouldValidate: true })}
     />,
   ];
 
   return (
     <SafeAreaView style={styles.container}>
       <ProgressStepBar totalPage={totalPage} currentPage={pageIndex + 1} />
-      {pageIndex + 1 !== 5 && (
+
+      {pageIndex + 1 !== totalPage && (
         <View style={styles.headerContainer}>
           <Text style={styles.headerText}>
             당신과 딱 맞는 동행을 위해 여행 설문을 시작할게요
           </Text>
         </View>
       )}
+
       <PagerView
         ref={pagerRef}
         style={styles.pager}
@@ -117,9 +151,9 @@ export default function TravelFormScreen() {
         scrollEnabled={false}
         onPageSelected={(e) => setPageIndex(e.nativeEvent.position)}
       >
-        {pages.map((PageComponent, idx) => (
+        {pages.map((Page, idx) => (
           <View key={idx} style={styles.page}>
-            {PageComponent}
+            {Page}
           </View>
         ))}
       </PagerView>
@@ -128,8 +162,7 @@ export default function TravelFormScreen() {
         <CustomButton
           label={pageIndex === totalPage - 1 ? "완료" : "다음"}
           onPress={goNext}
-          //   disabled={!isValid()}
-          inValid={!isValid()}
+          inValid={!isStepValid()}
         />
       </View>
     </SafeAreaView>
