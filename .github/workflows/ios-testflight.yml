@@ -16,7 +16,7 @@ jobs:
       # Expo/EAS CLI 설치 (토큰으로 로그인 포함)
       - uses: expo/expo-github-action@v8
         with:
-          token: ${{ secrets.EXPO_SECRET_ACCESS_TOKEN }}
+          token: ${{ secrets.EXPO_TOKEN }}
           eas-version: latest
 
       # iOS 빌드 + TestFlight 자동 배포(submit)
@@ -28,8 +28,8 @@ jobs:
             --auto-submit \
             --non-interactive
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_SECRET_ACCESS_TOKEN }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SECRET_PASSWORD_WIT }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
 
     concurrency:
       group: ios-testflight

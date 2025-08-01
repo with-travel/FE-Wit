@@ -20,7 +20,10 @@
   },
   "submit": {
     "production": {
-      "appleAppSpecificPassword": "$APPLE_APP_SPECIFIC_PASSWORD"
+      "appleAppSpecificPassword": "$APPLE_APP_SPECIFIC_PASSWORD",
+      "ios": {
+        "appleAppSpecificPassword": "$APPLE_APP_SPECIFIC_PASSWORD"
+      }
     }
   }
 }
