@@ -27,8 +27,7 @@ jobs:
 
       # service-account.json 파일 생성
       - name: Create service-account.json
-        run: |
-          echo "$GOOGLE_SERVICE_ACCOUNT_JSON" > service-account.json
+        run: echo "$GOOGLE_SERVICE_ACCOUNT_JSON" > service-account.json
 
       # Expo/EAS CLI 설치 & 로그인
       - uses: expo/expo-github-action@v8
