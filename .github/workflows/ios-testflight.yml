@@ -1,6 +1,10 @@
 name: 📦 iOS Build & 🚀 TestFlight
 
 on:
+  workflow_run:
+    workflows: ["CHANGELOG 자동 업데이트"]
+    types:
+      - completed
   push:
     branches: [main]
   workflow_dispatch:
