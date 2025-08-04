@@ -10,12 +10,24 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { postLogin } from "@/api/auth";
 
 const { width, height } = Dimensions.get("window");
 
 export default function AuthHomeScreen() {
-  const handleKakaoLogin = () => {
-    console.log("카카오 로그인 시작");
+  const handleKakaoLogin = async () => {
+    try {
+      const requestData = {
+        OauthId: "kakao",
+        email: "test@test.com",
+        name: "test",
+      };
+
+      const response = await postLogin(requestData);
+      console.log(JSON.stringify(response));
+    } catch (error) {
+      console.log(error);
+    }
     router.replace("/auth/travelform");
   };
 
