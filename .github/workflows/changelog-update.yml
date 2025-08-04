@@ -365,7 +365,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "📝 변경사항이 없습니다"
           else
-            git commit -m "Malsami 버전 관리 : chore: 버전 ${{ steps.version.outputs.new_version }} (PR #${{ github.event.pull_request.number }})"
+            git commit -m "Wit 버전 관리 : chore: 버전 ${{ steps.version.outputs.new_version }} (PR #${{ github.event.pull_request.number }})"
             git push origin develop
             echo "✅ 변경사항이 성공적으로 커밋되었습니다"
           fi
