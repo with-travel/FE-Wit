@@ -28,30 +28,34 @@ jobs:
           git config --local user.name "GitHub Action"
           git pull origin develop
 
-      - name: 현재 버전 확인
-        id: current_version
-        run: |
-          CURRENT_VERSION=$(grep '"version":' Wit/app.json | sed 's/.*"version": "\([^"]*\)".*/\1/')
-          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-          echo "현재 버전: $CURRENT_VERSION"
+          - name: 현재 버전 확인
+          id: current_version
+          run: |
+            CURRENT_VERSION=$(grep '"version":' app.json | sed 's/.*"version": "\([^"]*\)".*/\1/')
+            echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            echo "현재 버전: $CURRENT_VERSION"
 
       - name: 새 버전 계산 (patch 버전 증가)
         id: version
         run: |
           VERSION="${{ steps.current_version.outputs.current_version }}"
+
+          # patch 버전 증가 (1.0.0 → 1.0.1)
           IFS='.' read -ra VERSION_PARTS <<< "$VERSION"
           MAJOR=${VERSION_PARTS[0]}
           MINOR=${VERSION_PARTS[1]}
           PATCH=${VERSION_PARTS[2]}
+
           NEW_PATCH=$((PATCH + 1))
           NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "새 버전: $NEW_VERSION"
 
-      - name: app.json 업데이트
-        run: |
-          sed -i 's/"version": "[^"]*"/"version": "'${{ steps.version.outputs.new_version }}'"/' Wit/app.json
-          echo "app.json 업데이트 완료: ${{ steps.version.outputs.new_version }}"
+          - name: app.json 업데이트
+          run: |
+            sed -i 's/"version": "[^"]*"/"version": "'${{ steps.version.outputs.new_version }}'"/' app.json
+            echo "app.json 업데이트 완료: ${{ steps.version.outputs.new_version }}"
 
       - name: CodeRabbit Summary 업데이트 감지 (스마트 폴링)
         id: detect_summary
@@ -103,6 +107,11 @@ jobs:
             grep -A 50 "Summary by CodeRabbit" pr_content.html > summary_section.html
           fi
           cat summary_section.html | sed 's/<[^>]*>//g' | sed 's/&nbsp;/ /g; s/&amp;/\&/g; s/&lt;/</g; s/&gt;/>/g; s/&quot;/"/g' > raw_summary.txt
+          echo "🔍 동적 카테고리 추출 중..."
+          echo "📄 Summary 섹션 미리보기:"
+          head -10 summary_section.html
+
+          # Python으로 동적 파싱
           cat > parse_changelog.py << 'EOF'
           import re
           import json
@@ -112,6 +121,10 @@ jobs:
           from datetime import datetime
 
           def extract_items_from_section(html_content, section_title):
+                """특정 섹션의 아이템들을 추출"""
+              print(f"📋 '{section_title}' 섹션에서 아이템 추출 중...")
+              
+              # 다양한 패턴으로 섹션 찾기
               patterns = [
                   f'<strong[^>]*>{re.escape(section_title)}[^<]*</strong>',
                   f'<li[^>]*><strong[^>]*>{re.escape(section_title)}[^<]*</strong>',
@@ -121,12 +134,18 @@ jobs:
               for pattern in patterns:
                   section_match = re.search(pattern, html_content, re.IGNORECASE)
                   if section_match:
+                      print(f"✅ 패턴 매치: {pattern[:50]}...")
                       break
               if not section_match:
+                  print(f"❌ 패턴 매치 실패: {pattern[:50]}...")
                   return []
+              
+              # 섹션 이후의 ul 태그 찾기
               after_section = html_content[section_match.end():]
               ul_match = re.search(r'<ul[^>]*>(.*?)</ul>', after_section, re.DOTALL)
+              
               if not ul_match:
+                  print(f"❌ '{section_title}' 섹션 이후 ul 태그를 찾을 수 없습니다")
                   return []
               ul_content = ul_match.group(1)
               li_items = re.findall(r'<li[^>]*>(.*?)</li>', ul_content, re.DOTALL)
@@ -136,6 +155,9 @@ jobs:
                   clean_text = html.unescape(clean_text).strip()
                   if clean_text:
                       items.append(clean_text)
+                      print(f"  📝 아이템: {clean_text[:50]}...")
+              
+              print(f"✅ '{section_title}' 섹션에서 {len(items)}개 아이템 추출 완료")
               return items
 
           def detect_categories(html_content):
@@ -192,6 +214,10 @@ jobs:
                   changelog_data["releases"].insert(0, new_release)
                   with open('Wit/CHANGELOG.json', 'w', encoding='utf-8') as f:
                       json.dump(changelog_data, f, indent=2, ensure_ascii=False)
+
+                  print("✅ CHANGELOG.json 업데이트 완료!")
+                  print(f"📊 총 {len(categories)}개 카테고리, {sum(len(v['items']) for v in categories.values())}개 변경사항")
+                  
               except Exception as e:
                   print(f"❌ 파싱 오류: {e}")
                   sys.exit(1)
@@ -211,9 +237,9 @@ jobs:
           python3 << 'PYTHON_SCRIPT'
           import json
           try:
-              with open('Wit/CHANGELOG.json', 'r', encoding='utf-8') as f:
+              with open('CHANGELOG.json', 'r', encoding='utf-8') as f:
                   data = json.load(f)
-              with open('Wit/CHANGELOG.md', 'w', encoding='utf-8') as f:
+              with open('CHANGELOG.md', 'w', encoding='utf-8') as f:
                   f.write("# Changelog\n\n")
                   for release in data['releases']:
                       f.write(f"## [{release['version']}] - {release['date']}\n\n")
@@ -239,12 +265,17 @@ jobs:
       - name: 변경사항 커밋 및 푸시
         if: env.SUMMARY_FOUND == 'true'
         run: |
+          # 최신 상태로 다시 pull
           git pull origin develop
-          git add Wit/app.json Wit/CHANGELOG.json Wit/CHANGELOG.md
+
+          # 변경사항 추가
+          git add app.json CHANGELOG.json CHANGELOG.md
+
+          # 변경사항이 있는지 확인
           if git diff --staged --quiet; then
             echo "📝 변경사항이 없습니다"
           else
-            git commit -m "Wit 버전 관리 : chore: 버전 ${{ steps.version.outputs.new_version }} (PR #${{ github.event.pull_request.number }})"
+            git commit -m "Malsami 버전 관리 : chore: 버전 ${{ steps.version.outputs.new_version }} (PR #${{ github.event.pull_request.number }})"
             git push origin develop
             echo "✅ 변경사항이 성공적으로 커밋되었습니다"
           fi
@@ -255,7 +286,7 @@ jobs:
             echo "✅ CHANGELOG 업데이트 완료!"
             echo "📦 새 버전: ${{ steps.version.outputs.new_version }}"
             echo "🔗 PR: #${{ github.event.pull_request.number }}"
-            echo "📄 Wit/app.json, Wit/CHANGELOG.json 및 Wit/CHANGELOG.md가 업데이트되었습니다"
+            echo "📄 app.json, CHANGELOG.json 및 CHANGELOG.md가 업데이트되었습니다"
             echo "🎯 동적 카테고리 파싱으로 AI 생성 콘텐츠 유연하게 처리됨"
           else
             echo "⚠️ CodeRabbit Summary를 찾을 수 없어 업데이트를 건너뛰었습니다"
@@ -271,14 +302,22 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "🔄 PR #${{ github.event.pull_request.number }} 자동 머지 시도 중..."
+
+          # PR 상태 확인
           PR_STATE=$(gh pr view ${{ github.event.pull_request.number }} --json state,mergeable --jq '.state + "," + (.mergeable | tostring)')
           echo "PR 상태: $PR_STATE"
+
+          # 머지 시도
           if gh pr merge ${{ github.event.pull_request.number }} --merge; then
             echo "✅ PR이 성공적으로 머지되었습니다!"
           else
             echo "❌ PR 머지에 실패했습니다. 수동으로 처리해주세요."
             exit 1
           fi
+
           echo "🚀 main 브랜치 업데이트 시작..."
+          # 현재 develop 브랜치의 최신 상태를 main 브랜치로 강제 푸시
+          # 현재 브랜치가 develop이므로 직접 푸시 가능
           git push origin HEAD:main --force
+
           echo "✅ main 브랜치 업데이트 완료! 배포 워크플로우가 자동으로 트리거됩니다."
