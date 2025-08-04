@@ -6,12 +6,27 @@ import { ResponseLogin } from "@/types/response/auth";
 async function postLogin({
   OauthId,
   name,
-  nickname,
   email,
-  gender,
-  birth,
 }: RequestLogin): Promise<ResponseLogin> {
-  const { data } = await axiosInstance.post("/signup/register");
+  const body = {
+    oauthId: OauthId,
+    email: email,
+    name: name,
+  };
+  console.log("body", body);
+  console.log(
+    "process.env.EXPO_PUBLIC_SERVER_BASEURL",
+    process.env.EXPO_PUBLIC_SERVER_BASEURL
+  );
+  const { data } = await axiosInstance.post(
+    "/api/v1/signup/member/verify",
+    body,
+    {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
 
   return data;
 }
