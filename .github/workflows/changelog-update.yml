@@ -1,0 +1,284 @@
+name: CHANGELOG 자동 업데이트
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: ["main"]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-changelog:
+    name: CHANGELOG.json 업데이트
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          ref: develop
+
+      - name: Git 설정 및 최신 상태 동기화
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git pull origin develop
+
+      - name: 현재 버전 확인
+        id: current_version
+        run: |
+          CURRENT_VERSION=$(grep '"version":' Wit/app.json | sed 's/.*"version": "\([^"]*\)".*/\1/')
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "현재 버전: $CURRENT_VERSION"
+
+      - name: 새 버전 계산 (patch 버전 증가)
+        id: version
+        run: |
+          VERSION="${{ steps.current_version.outputs.current_version }}"
+          IFS='.' read -ra VERSION_PARTS <<< "$VERSION"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]}
+          PATCH=${VERSION_PARTS[2]}
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "새 버전: $NEW_VERSION"
+
+      - name: app.json 업데이트
+        run: |
+          sed -i 's/"version": "[^"]*"/"version": "'${{ steps.version.outputs.new_version }}'"/' Wit/app.json
+          echo "app.json 업데이트 완료: ${{ steps.version.outputs.new_version }}"
+
+      - name: CodeRabbit Summary 업데이트 감지 (스마트 폴링)
+        id: detect_summary
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          VERSION="${{ steps.version.outputs.new_version }}"
+          TODAY=$(date '+%Y-%m-%d')
+          MAX_ATTEMPTS=120
+          ATTEMPT=0
+          echo "🔍 PR #$PR_NUMBER에서 CodeRabbit Summary 업데이트 감지 시작..."
+          echo "최대 대기 시간: 10분 (5초마다 체크)"
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "[$ATTEMPT/$MAX_ATTEMPTS] CodeRabbit Summary 확인 중... ($(date '+%H:%M:%S'))"
+            curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                 -H "Accept: application/vnd.github.v3.html" \
+                 "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}" \
+                 > pr_content.html
+            if grep -q "No description provided" pr_content.html; then
+              echo "❌ 아직 'No description provided' 상태입니다"
+            elif grep -q "Summary by CodeRabbit" pr_content.html; then
+              echo "✅ CodeRabbit Summary 발견! 파싱을 시작합니다"
+              echo "SUMMARY_FOUND=true" >> $GITHUB_ENV
+              break
+            else
+              echo "⏳ CodeRabbit Summary 아직 없음"
+            fi
+            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+              sleep 5
+            fi
+          done
+          if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+            echo "⚠️ 10분 대기 후에도 CodeRabbit Summary를 찾을 수 없습니다"
+            echo "SUMMARY_FOUND=false" >> $GITHUB_ENV
+          fi
+
+      - name: 동적 Summary 파싱 및 CHANGELOG.json 업데이트
+        if: env.SUMMARY_FOUND == 'true'
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          VERSION="${{ steps.version.outputs.new_version }}"
+          TODAY=$(date '+%Y-%m-%d')
+          TIMESTAMP=$(date '+%Y-%m-%dT%H:%M:%SZ')
+          echo "📝 CodeRabbit Summary 동적 파싱 시작..."
+          sed -n '/<h2[^>]*>Summary by CodeRabbit<\/h2>/,/<\/div>/p' pr_content.html > summary_section.html
+          echo "📄 추출된 Summary 섹션 크기: $(wc -c < summary_section.html) bytes"
+          if [ $(wc -c < summary_section.html) -lt 100 ]; then
+            echo "⚠️ Summary 섹션이 너무 작습니다. 전체 PR 내용에서 다시 추출 시도..."
+            grep -A 50 "Summary by CodeRabbit" pr_content.html > summary_section.html
+          fi
+          cat summary_section.html | sed 's/<[^>]*>//g' | sed 's/&nbsp;/ /g; s/&amp;/\&/g; s/&lt;/</g; s/&gt;/>/g; s/&quot;/"/g' > raw_summary.txt
+          cat > parse_changelog.py << 'EOF'
+          import re
+          import json
+          import html
+          import sys
+          import os
+          from datetime import datetime
+
+          def extract_items_from_section(html_content, section_title):
+              patterns = [
+                  f'<strong[^>]*>{re.escape(section_title)}[^<]*</strong>',
+                  f'<li[^>]*><strong[^>]*>{re.escape(section_title)}[^<]*</strong>',
+                  f'<p[^>]*><strong[^>]*>{re.escape(section_title)}[^<]*</strong></p>'
+              ]
+              section_match = None
+              for pattern in patterns:
+                  section_match = re.search(pattern, html_content, re.IGNORECASE)
+                  if section_match:
+                      break
+              if not section_match:
+                  return []
+              after_section = html_content[section_match.end():]
+              ul_match = re.search(r'<ul[^>]*>(.*?)</ul>', after_section, re.DOTALL)
+              if not ul_match:
+                  return []
+              ul_content = ul_match.group(1)
+              li_items = re.findall(r'<li[^>]*>(.*?)</li>', ul_content, re.DOTALL)
+              items = []
+              for item in li_items:
+                  clean_text = re.sub(r'<[^>]*>', '', item)
+                  clean_text = html.unescape(clean_text).strip()
+                  if clean_text:
+                      items.append(clean_text)
+              return items
+
+          def detect_categories(html_content):
+              detected_categories = {}
+              strong_texts = re.findall(r'<strong[^>]*>([^<]+)</strong>', html_content, re.IGNORECASE)
+              for strong_text in strong_texts:
+                  clean_text = strong_text.strip()
+                  items = extract_items_from_section(html_content, clean_text)
+                  if items:
+                      safe_key = re.sub(r'[^a-zA-Z0-9가-힣]', '_', clean_text.lower()).strip('_')
+                      if not safe_key:
+                          safe_key = f"category_{len(detected_categories)}"
+                      detected_categories[safe_key] = {
+                          'title': clean_text,
+                          'items': items
+                      }
+              return detected_categories
+
+          def main():
+              version = os.environ.get('VERSION')
+              today = os.environ.get('TODAY')
+              pr_number = int(os.environ.get('PR_NUMBER'))
+              timestamp = os.environ.get('TIMESTAMP')
+              try:
+                  with open('summary_section.html', 'r', encoding='utf-8') as f:
+                      html_content = f.read()
+                  categories = detect_categories(html_content)
+                  with open('raw_summary.txt', 'r', encoding='utf-8') as f:
+                      raw_summary = f.read().strip()
+                  new_release = {
+                      "version": version,
+                      "date": today,
+                      "pr_number": pr_number,
+                      "raw_summary": raw_summary,
+                      "parsed_changes": {}
+                  }
+                  for key, value in categories.items():
+                      new_release["parsed_changes"][key] = value["items"]
+                  try:
+                      with open('Wit/CHANGELOG.json', 'r', encoding='utf-8') as f:
+                          changelog_data = json.load(f)
+                  except (FileNotFoundError, json.JSONDecodeError):
+                      changelog_data = {
+                          "metadata": {
+                              "lastUpdated": timestamp,
+                              "currentVersion": version,
+                              "totalReleases": 0
+                          },
+                          "releases": []
+                      }
+                  changelog_data["metadata"]["lastUpdated"] = timestamp
+                  changelog_data["metadata"]["currentVersion"] = version
+                  changelog_data["metadata"]["totalReleases"] = len(changelog_data["releases"]) + 1
+                  changelog_data["releases"].insert(0, new_release)
+                  with open('Wit/CHANGELOG.json', 'w', encoding='utf-8') as f:
+                      json.dump(changelog_data, f, indent=2, ensure_ascii=False)
+              except Exception as e:
+                  print(f"❌ 파싱 오류: {e}")
+                  sys.exit(1)
+          if __name__ == "__main__":
+              main()
+          EOF
+          export VERSION="$VERSION"
+          export TODAY="$TODAY"
+          export PR_NUMBER="$PR_NUMBER"
+          export TIMESTAMP="$TIMESTAMP"
+          python3 parse_changelog.py
+
+      - name: CHANGELOG.md 재생성
+        if: env.SUMMARY_FOUND == 'true'
+        run: |
+          echo "📄 CHANGELOG.json에서 CHANGELOG.md 재생성 중..."
+          python3 << 'PYTHON_SCRIPT'
+          import json
+          try:
+              with open('Wit/CHANGELOG.json', 'r', encoding='utf-8') as f:
+                  data = json.load(f)
+              with open('Wit/CHANGELOG.md', 'w', encoding='utf-8') as f:
+                  f.write("# Changelog\n\n")
+                  for release in data['releases']:
+                      f.write(f"## [{release['version']}] - {release['date']}\n\n")
+                      for category_key, items in release['parsed_changes'].items():
+                          if items:
+                              title = category_key.replace('_', ' ').title()
+                              if isinstance(items, dict) and 'title' in items:
+                                  title = items['title']
+                                  actual_items = items['items']
+                              else:
+                                  actual_items = items
+                              f.write(f"**{title}**\n")
+                              for item in actual_items:
+                                  f.write(f"- {item}\n")
+                              f.write("\n")
+                      f.write("---\n\n")
+              print("✅ CHANGELOG.md 재생성 완료!")
+          except Exception as e:
+              print(f"❌ CHANGELOG.md 생성 실패: {e}")
+              exit(1)
+          PYTHON_SCRIPT
+
+      - name: 변경사항 커밋 및 푸시
+        if: env.SUMMARY_FOUND == 'true'
+        run: |
+          git pull origin develop
+          git add Wit/app.json Wit/CHANGELOG.json Wit/CHANGELOG.md
+          if git diff --staged --quiet; then
+            echo "📝 변경사항이 없습니다"
+          else
+            git commit -m "Wit 버전 관리 : chore: 버전 ${{ steps.version.outputs.new_version }} (PR #${{ github.event.pull_request.number }})"
+            git push origin develop
+            echo "✅ 변경사항이 성공적으로 커밋되었습니다"
+          fi
+
+      - name: 업데이트 완료 알림
+        run: |
+          if [ "${{ env.SUMMARY_FOUND }}" == "true" ]; then
+            echo "✅ CHANGELOG 업데이트 완료!"
+            echo "📦 새 버전: ${{ steps.version.outputs.new_version }}"
+            echo "🔗 PR: #${{ github.event.pull_request.number }}"
+            echo "📄 Wit/app.json, Wit/CHANGELOG.json 및 Wit/CHANGELOG.md가 업데이트되었습니다"
+            echo "🎯 동적 카테고리 파싱으로 AI 생성 콘텐츠 유연하게 처리됨"
+          else
+            echo "⚠️ CodeRabbit Summary를 찾을 수 없어 업데이트를 건너뛰었습니다"
+          fi
+
+      - name: 정리
+        run: |
+          rm -f pr_content.html summary_section.html raw_summary.txt parse_changelog.py
+
+      - name: 자동 PR Merge 및 main 브랜치 업데이트
+        if: env.SUMMARY_FOUND == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🔄 PR #${{ github.event.pull_request.number }} 자동 머지 시도 중..."
+          PR_STATE=$(gh pr view ${{ github.event.pull_request.number }} --json state,mergeable --jq '.state + "," + (.mergeable | tostring)')
+          echo "PR 상태: $PR_STATE"
+          if gh pr merge ${{ github.event.pull_request.number }} --merge; then
+            echo "✅ PR이 성공적으로 머지되었습니다!"
+          else
+            echo "❌ PR 머지에 실패했습니다. 수동으로 처리해주세요."
+            exit 1
+          fi
+          echo "🚀 main 브랜치 업데이트 시작..."
+          git push origin HEAD:main --force
+          echo "✅ main 브랜치 업데이트 완료! 배포 워크플로우가 자동으로 트리거됩니다."
