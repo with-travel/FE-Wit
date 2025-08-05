@@ -1,0 +1,162 @@
+name: 📖 README 자동 업데이트
+
+# ios-testflight 워크플로우가 끝나면 실행
+on:
+  workflow_run:
+    workflows: ["📦 iOS Build & 🚀 TestFlight"]
+    types:
+      - completed
+
+jobs:
+  update-readme:
+    # ios-testflight가 성공한 경우에만 실행
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write # 커밋/푸시 권한
+
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Node.js 세팅
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: CHANGELOG.json에서 최신 릴리즈 정보 읽기
+        id: read_changelog
+        run: |
+          # CHANGELOG.json 파일 존재 확인
+          if [ ! -f "CHANGELOG.json" ]; then
+            echo "❌ CHANGELOG.json 파일을 찾을 수 없습니다"
+            exit 1
+          fi
+
+          # jq 설치 확인 및 설치
+          if ! command -v jq &> /dev/null; then
+            echo "📦 jq 설치 중..."
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+
+          # 최신 릴리즈 정보 추출
+          LATEST=$(jq '.releases[0]' CHANGELOG.json)
+
+          if [ "$LATEST" = "null" ] || [ -z "$LATEST" ]; then
+            echo "❌ CHANGELOG.json에서 릴리즈 정보를 찾을 수 없습니다"
+            exit 1
+          fi
+
+          VERSION=$(echo "$LATEST" | jq -r '.version')
+          DATE=$(echo "$LATEST" | jq -r '.date')
+
+          echo "📋 버전: $VERSION"
+          echo "📅 날짜: $DATE"
+
+          # parsed_changes를 마크다운 형식으로 변환
+          CHANGES=$(echo "$LATEST" | jq -r '
+            .parsed_changes | to_entries[] | 
+            "**" + (.value.title // .key | gsub("_"; " ") | ascii_upcase) + "**\n" +
+            (.value.items[] | "- " + . + "\n")
+          ')
+
+          # 출력 변수 설정
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "date=$DATE" >> $GITHUB_OUTPUT
+          echo "changes<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$CHANGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "✅ CHANGELOG 정보 추출 완료"
+
+      - name: README.md 생성/갱신
+        run: |
+          VERSION="${{ steps.read_changelog.outputs.version }}"
+          DATE="${{ steps.read_changelog.outputs.date }}"
+          CHANGES="${{ steps.read_changelog.outputs.changes }}"
+
+          echo "# Wit App" > README.md
+          echo "" >> README.md
+          echo "간단한 앱 소개 문구를 여기에 적습니다." >> README.md
+          echo "" >> README.md
+          echo "---" >> README.md
+          echo "" >> README.md
+          echo "## 최신 버전 정보" >> README.md
+          echo "" >> README.md
+          echo "**버전:** $VERSION" >> README.md
+          echo "**변경 날짜:** $DATE" >> README.md
+          echo "" >> README.md
+          echo "### 변경 사항" >> README.md
+          echo "" >> README.md
+          echo "$CHANGES" >> README.md
+          echo "" >> README.md
+          echo "---" >> README.md
+          echo "" >> README.md
+          echo "[이전 변경사항 보기](PREVIOUS_CHANGES.md)" >> README.md
+
+      - name: 이전 변경사항 전체 문서 생성
+        run: |
+          # CHANGELOG.md 파일이 존재하는지 확인
+          if [ -f "CHANGELOG.md" ]; then
+            cp CHANGELOG.md PREVIOUS_CHANGES.md
+            echo "✅ PREVIOUS_CHANGES.md 생성 완료"
+          else
+            echo "⚠️ CHANGELOG.md 파일이 없어 PREVIOUS_CHANGES.md를 생성하지 않습니다"
+            touch PREVIOUS_CHANGES.md
+          fi
+
+      - name: 변경사항 커밋 및 main 브랜치 푸시
+        run: |
+          # Git 설정
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # 최신 상태로 pull
+          git pull origin main
+
+          # 변경사항 추가
+          git add README.md PREVIOUS_CHANGES.md
+
+          # 변경사항이 있는지 확인
+          if git diff --cached --quiet; then
+            echo "📝 변경사항이 없습니다"
+            exit 0
+          else
+            # 커밋 메시지 생성
+            VERSION="${{ steps.read_changelog.outputs.version }}"
+            COMMIT_MSG="docs: README 최신 릴리즈(v${VERSION}) 자동 업데이트"
+            
+            git commit -m "$COMMIT_MSG"
+            git push origin HEAD:main
+            
+            echo "✅ main 브랜치에 커밋 및 푸시 완료"
+          fi
+
+      - name: develop 브랜치로 체크아웃 및 main 변경사항 rebase
+        run: |
+          git fetch origin
+          git checkout develop
+          git pull origin develop
+          set -e
+          if git rebase main; then
+            echo "✅ develop 브랜치에 main 변경사항 rebase 성공"
+            git push origin develop
+          else
+            echo "❌ rebase 중 충돌 발생! 수동 해결 필요"
+            git rebase --abort
+            exit 1
+          fi
+
+      - name: 업데이트 완료 알림
+        run: |
+          VERSION="${{ steps.read_changelog.outputs.version }}"
+          DATE="${{ steps.read_changelog.outputs.date }}"
+
+          echo "✅ README 자동 업데이트 및 develop 브랜치 반영 완료!"
+          echo "📦 버전: $VERSION"
+          echo "📅 날짜: $DATE"
+          echo "📄 README.md 및 PREVIOUS_CHANGES.md가 main, develop 모두에 반영되었습니다"
