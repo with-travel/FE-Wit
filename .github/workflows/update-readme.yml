@@ -6,6 +6,7 @@ on:
     workflows: ["📦 iOS Build & 🚀 TestFlight"]
     types:
       - completed
+  workflow_dispatch:
 
 jobs:
   update-readme:
@@ -57,11 +58,11 @@ jobs:
           echo "📋 버전: $VERSION"
           echo "📅 날짜: $DATE"
 
-          # parsed_changes를 마크다운 형식으로 변환
+          # parsed_changes를 마크다운 형식으로 변환 (구조에 맞게 수정)
           CHANGES=$(echo "$LATEST" | jq -r '
             .parsed_changes | to_entries[] | 
-            "**" + (.value.title // .key | gsub("_"; " ") | ascii_upcase) + "**\n" +
-            (.value.items[] | "- " + . + "\n")
+            "**" + (.key | gsub("_"; " ") | ascii_upcase) + "**\n" +
+            (.value[] | "- " + . + "\n")
           ')
 
           # 출력 변수 설정
