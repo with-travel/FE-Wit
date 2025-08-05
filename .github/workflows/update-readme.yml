@@ -6,12 +6,12 @@ on:
     workflows: ["📦 iOS Build & 🚀 TestFlight"]
     types:
       - completed
-  workflow_dispatch:
+  workflow_dispatch: # 수동 실행 트리거 추가
 
 jobs:
   update-readme:
-    # ios-testflight가 성공한 경우에만 실행
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # workflow_run 이벤트일 때는 성공한 경우에만, workflow_dispatch일 때는 항상 실행
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
 
     permissions:
