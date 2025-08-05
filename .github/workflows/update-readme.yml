@@ -74,30 +74,56 @@ jobs:
 
           echo "✅ CHANGELOG 정보 추출 완료"
 
-      - name: README.md 생성/갱신
+      - name: README.md changelog 영역만 갱신
         run: |
           VERSION="${{ steps.read_changelog.outputs.version }}"
           DATE="${{ steps.read_changelog.outputs.date }}"
           CHANGES="${{ steps.read_changelog.outputs.changes }}"
 
-          echo "# Wit App" > README.md
-          echo "" >> README.md
-          echo "간단한 앱 소개 문구를 여기에 적습니다." >> README.md
-          echo "" >> README.md
-          echo "---" >> README.md
-          echo "" >> README.md
-          echo "## 최신 버전 정보" >> README.md
-          echo "" >> README.md
-          echo "**버전:** $VERSION" >> README.md
-          echo "**변경 날짜:** $DATE" >> README.md
-          echo "" >> README.md
-          echo "### 변경 사항" >> README.md
-          echo "" >> README.md
-          echo "$CHANGES" >> README.md
-          echo "" >> README.md
-          echo "---" >> README.md
-          echo "" >> README.md
-          echo "[이전 변경사항 보기](PREVIOUS_CHANGES.md)" >> README.md
+          # README.md 파일이 없으면 기본 템플릿 생성
+          if [ ! -f "README.md" ]; then
+            echo "# Wit App" > README.md
+            echo "" >> README.md
+            echo "간단한 앱 소개 문구를 여기에 적습니다." >> README.md
+            echo "" >> README.md
+            echo "<!-- CHANGELOG-START -->" >> README.md
+            echo "## 최신 버전 정보" >> README.md
+            echo "" >> README.md
+            echo "**버전:** 1.0.0" >> README.md
+            echo "**변경 날짜:** 2025-01-01" >> README.md
+            echo "" >> README.md
+            echo "### 변경 사항" >> README.md
+            echo "" >> README.md
+            echo "- 초기 버전" >> README.md
+            echo "" >> README.md
+            echo "<!-- CHANGELOG-END -->" >> README.md
+            echo "" >> README.md
+            echo "[이전 변경사항 보기](PREVIOUS_CHANGES.md)" >> README.md
+            echo "✅ README.md 기본 템플릿 생성 완료"
+          fi
+
+          # changelog 영역만 갱신 (간단한 방식)
+          echo "📝 README.md changelog 영역 갱신 중..."
+
+          # 새로운 changelog 내용을 임시 파일에 저장
+          echo "" > temp_changelog.md
+          echo "## 최신 버전 정보" >> temp_changelog.md
+          echo "" >> temp_changelog.md
+          echo "**버전:** $VERSION" >> temp_changelog.md
+          echo "**변경 날짜:** $DATE" >> temp_changelog.md
+          echo "" >> temp_changelog.md
+          echo "### 변경 사항" >> temp_changelog.md
+          echo "" >> temp_changelog.md
+          echo "$CHANGES" >> temp_changelog.md
+          echo "" >> temp_changelog.md
+
+          # awk를 사용하여 changelog 영역 교체
+          awk '/<!-- CHANGELOG-START -->/{p=1; print; next} /<!-- CHANGELOG-END -->/{p=0; print; next} p{next} {print}' README.md > temp_readme.md
+          awk '/<!-- CHANGELOG-START -->/{print; system("cat temp_changelog.md"); next} {print}' temp_readme.md > README.md
+
+          # 임시 파일 정리
+          rm -f temp_changelog.md temp_readme.md
+          echo "✅ README.md changelog 영역 갱신 완료"
 
       - name: 이전 변경사항 전체 문서 생성
         run: |
