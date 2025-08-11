@@ -36,7 +36,7 @@ function RootNavigator() {
         position: "top",
         visibilityTime: 2500,
       });
-  }, [auth.id]);
+  }, [auth.id, auth.nickname]);
   //auth값에 따른 분기점 설정 필요함
   return (
     <Stack
@@ -45,8 +45,18 @@ function RootNavigator() {
       }}
     >
       {auth.id ? (
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        auth.infoChecked ? (
+          // ID 있고 infoChecked가 true면 메인 화면으로
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        ) : (
+          // ID 있지만 infoChecked가 false면 추가정보 입력 화면으로
+          <Stack.Screen
+            name="auth/extrainfo"
+            options={{ headerShown: false }}
+          />
+        )
       ) : (
+        // ID 없으면 로그인 화면으로
         <Stack.Screen name="auth" options={{ headerShown: false }} />
       )}
       <Stack.Screen name="+not-found" />
