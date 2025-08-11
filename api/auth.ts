@@ -1,7 +1,6 @@
-import { UserInfo } from "@/types/domain/user";
 import { axiosInstance } from "./axios";
 import { RequestLogin } from "@/types/request/auth";
-import { ResponseLogin } from "@/types/response/auth";
+import { ResponseLogin, ResponseUserInfo } from "@/types/response/auth";
 
 async function postLogin({
   OauthId,
@@ -31,9 +30,8 @@ async function postLogin({
   return data;
 }
 
-async function getMyInfo(): Promise<UserInfo> {
-  //토큰 첨부 필요?
-  const { data } = await axiosInstance.get("/signup/register");
+async function getMyInfo(): Promise<ResponseUserInfo> {
+  const { data } = await axiosInstance.get("/api/v1/signup/register");
 
   return data;
 }
