@@ -63,6 +63,10 @@ function useAuth() {
     auth: {
       id: data?.id ?? 0,
       nickname: data?.nickname ?? "",
+      infoChecked: data?.infoChecked ?? false,
+      email: data?.email ?? "",
+      birthDate: data?.birthDate ?? "",
+      gender: data?.gender ?? null,
     },
     loginMutation,
   };
