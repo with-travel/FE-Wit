@@ -11,10 +11,10 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useEffect } from "react";
 
-function useGetMyInfo() {
+function useGetUserInfo() {
   const { data, isError, isSuccess } = useQuery({
     queryFn: getMyInfo,
-    queryKey: [queryKeys.AUTH, queryKeys.GET_MY_INFO],
+    queryKey: [queryKeys.AUTH, queryKeys.GET_USER_INFO],
   });
 
   useEffect(() => {
@@ -47,7 +47,7 @@ function usePostLogin() {
       await setSecureStore(storageKeys.REFRESH_TOKEN, refreshToken);
       await setSecureStore(storageKeys.ACCESS_TOKEN, accessToken);
       queryClient.fetchQuery({
-        queryKey: [queryKeys.AUTH, queryKeys.GET_MY_INFO],
+        queryKey: [queryKeys.AUTH, queryKeys.GET_USER_INFO],
       });
       router.replace("/");
     },
@@ -56,7 +56,7 @@ function usePostLogin() {
 }
 
 function useAuth() {
-  const { data } = useGetMyInfo();
+  const { data } = useGetUserInfo();
   const loginMutation = usePostLogin();
 
   return {
