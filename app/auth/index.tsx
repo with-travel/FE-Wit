@@ -16,19 +16,8 @@ const { width, height } = Dimensions.get("window");
 
 export default function AuthHomeScreen() {
   const handleKakaoLogin = async () => {
-    try {
-      const requestData = {
-        OauthId: "kakao",
-        email: "test@test.com",
-        name: "test",
-      };
-
-      const response = await postLogin(requestData);
-      console.log(JSON.stringify(response));
-    } catch (error) {
-      console.log(error);
-    }
-    router.replace("/auth/travelform");
+    // router.push("/auth/kakaologin");
+    router.push("/auth/extrainfo");
   };
 
   return (
