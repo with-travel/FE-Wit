@@ -25,15 +25,13 @@ function InputField({ label, error, ...props }: InputFieldProps) {
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 32,
+    paddingHorizontal: 20,
   },
   labelText: {
     marginBottom: 4,
   },
   inputContainer: {
-    borderWidth: 1,
     paddingHorizontal: 20,
-    borderColor: colors.PRIMARY_COLOR,
     borderRadius: 5,
     height: 50,
     backgroundColor: "#F3F3F3",
