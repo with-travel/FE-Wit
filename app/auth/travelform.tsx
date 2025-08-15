@@ -1,199 +1,204 @@
 // TravelFormScreen.tsx
-import React, { useRef, useState } from "react";
-import { SafeAreaView, View, StyleSheet, Text } from "react-native";
-import PagerView from "react-native-pager-view";
-import { router } from "expo-router";
-import ProgressStepBar from "@/components/ProgressStepBar";
-import CustomButton from "@/components/CustomButton";
-import TravelQ1, { TravelType } from "@/components/travelQuestions/TravelQ1";
-import TravelQ2, { CharacterType } from "@/components/travelQuestions/TravelQ2";
-import TravelQ3, { StyleType } from "@/components/travelQuestions/TravelQ3";
-import TravelQ4, { ImportantType } from "@/components/travelQuestions/TravelQ4";
-import TravelQ5 from "@/components/travelQuestions/TravelQ5";
 import { colors } from "@/constants/colors";
+import React, { useEffect, useMemo, useState } from "react";
+import { View, StyleSheet, Text, ScrollView, SafeAreaView } from "react-native";
+import SingleSelectSection, {
+  Option,
+} from "@/components/auth/travelForm/SingleSelectSection";
+import CustomButton from "@/components/CustomButton";
 
-// **1**: React Hook Form import
-import { useForm, SubmitHandler } from "react-hook-form";
-// **2**: API 요청용 라이브러리 (원하는 것으로 교체)
-import axios from "axios";
-import Toast from "react-native-toast-message";
+// ── 섹션 데이터 (id는 서버/전송용 key, label은 UI 표기)
+const energyLevel: Option[] = [
+  { id: "morning", label: "#아침형인간" },
+  { id: "nightout", label: "#밤올빼미" },
+  { id: "energetic", label: "#에너자이저" },
+  { id: "healing", label: "#힐링모드" },
+];
 
-type TravelFormType = {
-  travelType: TravelType;
-  myCharacter: CharacterType;
-  preferType: StyleType;
-  importantThings: ImportantType[];
-  selfIntroduce: string;
-};
+const goal: Option[] = [
+  { id: "hotplace", label: "#핫플탐방러" },
+  { id: "local", label: "#현지감성" },
+  { id: "food", label: "#맛집러버" },
+  { id: "activity", label: "#액티비티팡" },
+  { id: "healing-priority", label: "#힐링우선" },
+];
+
+const pace: Option[] = [
+  { id: "tight", label: "#타이트스케줄" },
+  { id: "relaxed", label: "#여유만만" },
+  { id: "spontaneous", label: "#즉흥여행" },
+  { id: "plan-done", label: "#플랜준비완료" },
+];
+
+const comm: Option[] = [
+  { id: "talker", label: "#수다쟁이" },
+  { id: "quiet", label: "#조용한편" },
+  { id: "reactive", label: "#리액션킹" },
+  { id: "private", label: "#개인시간존중" },
+];
+
+const recordStyle: Option[] = [
+  { id: "photo", label: "#인생샷헌터" },
+  { id: "selfie-hard", label: "#셀카는못참지" },
+  { id: "like-record", label: "#기록좋아" },
+  { id: "view-first", label: "#눈으로만감상" },
+];
+
+const buddyStyle: Option[] = [
+  { id: "leader", label: "#리더쉽발휘" },
+  { id: "follower", label: "#따라가는편" },
+  { id: "opinion", label: "#의견제시" },
+  { id: "mood", label: "#분위기메이커" },
+];
+
+const spending: Option[] = [
+  { id: "value", label: "#가성비추구" },
+  { id: "worth", label: "#가치투자" },
+  { id: "flex", label: "#플렉스" },
+];
 
 export default function TravelFormScreen() {
-  const pagerRef = useRef<PagerView>(null);
-  const totalPage = 5;
-  const [pageIndex, setPageIndex] = useState(0);
+  const [energy, setEnergy] = useState<string | null>(null);
+  const [tripGoal, setTripGoal] = useState<string | null>(null);
+  const [tripPace, setTripPace] = useState<string | null>(null);
+  const [communication, setCommunication] = useState<string | null>(null);
+  const [record, setRecord] = useState<string | null>(null);
+  const [buddy, setBuddy] = useState<string | null>(null);
+  const [cost, setCost] = useState<string | null>(null);
 
-  const {
-    watch,
-    setValue,
-    handleSubmit,
-    formState: { isValid },
-  } = useForm<TravelFormType>({
-    mode: "onChange",
-    defaultValues: {
-      travelType: "" as TravelType,
-      myCharacter: "" as CharacterType,
-      preferType: "" as StyleType,
-      importantThings: [] as ImportantType[],
-      selfIntroduce: "",
-    },
-  });
+  const isValid = useMemo(
+    () =>
+      !!(
+        energy &&
+        tripGoal &&
+        tripPace &&
+        communication &&
+        record &&
+        buddy &&
+        cost
+      ),
+    [energy, tripGoal, tripPace, communication, record, buddy, cost]
+  );
 
-  const isStepValid = () => {
-    switch (pageIndex) {
-      case 0:
-        return watch("travelType") !== "";
-      case 1:
-        return watch("myCharacter") !== "";
-      case 2:
-        return watch("preferType") !== "";
-      case 3:
-        return watch("importantThings").length > 0;
-      case 4:
-        return watch("selfIntroduce").trim().length > 0;
-      default:
-        return false;
-    }
+  const onNext = () => {
+    if (!isValid) return;
+
+    // 서버에 보낼 페이로드 예시
+    const payload = {
+      energy,
+      goal: tripGoal,
+      pace: tripPace,
+      communication,
+      record,
+      buddy,
+      spending: cost,
+    };
+
+    // TODO: 전역 상태 저장 / API 호출 / 다음 화면 이동 등
+    // router.push("/next"); // expo-router 사용 시
+    console.log("SUBMIT ->", payload);
   };
-
-  const onSubmit: SubmitHandler<TravelFormType> = async (data) => {
-    console.log("data", data);
-    try {
-      await axios.post("https://your.api/travel-form", data);
-      Toast.show({
-        position: "top",
-        text1: "회원가입 절차가 완료되었습니다.",
-        type: "success",
-      });
-      router.replace("/");
-    } catch (error) {
-      Toast.show({
-        position: "top",
-        text1: "데이터 전송에 실패했습니다. 다시 시도해주세요.",
-        type: "error",
-      });
-      console.error("서버 전송 에러:", error);
-    }
-  };
-
-  // **6**: 다음 페이지로 이동 or 최종 제출
-  const goNext = () => {
-    if (pageIndex < totalPage - 1) {
-      const next = pageIndex + 1;
-      pagerRef.current?.setPage(next);
-      setPageIndex(next);
-    } else {
-      // 마지막 단계, handleSubmit 호출
-      handleSubmit(onSubmit)();
-    }
-  };
-
-  const pages = [
-    <TravelQ1
-      key="q1"
-      selected={watch("travelType")}
-      onSelect={(v) => setValue("travelType", v, { shouldValidate: true })}
-    />,
-    <TravelQ2
-      key="q2"
-      selected={watch("myCharacter")}
-      onSelect={(v) => setValue("myCharacter", v, { shouldValidate: true })}
-    />,
-    <TravelQ3
-      key="q3"
-      questionIndex={3}
-      questionText={`선호하는 여행 스타일은\n무엇인가요?`}
-      selected={watch("preferType")}
-      onSelect={(v) => setValue("preferType", v, { shouldValidate: true })}
-    />,
-    <TravelQ4
-      key="q4"
-      questionIndex={4}
-      questionText={`여행에서 제일 중요하게\n생각하는 것은 무엇인가요?`}
-      selected={watch("importantThings")}
-      onSelect={(v) => {
-        const arr = watch("importantThings");
-        const next = arr.includes(v) ? arr.filter((i) => i !== v) : [...arr, v];
-        setValue("importantThings", next, { shouldValidate: true });
-      }}
-    />,
-    <TravelQ5
-      key="q5"
-      value={watch("selfIntroduce")}
-      onChange={(t) => setValue("selfIntroduce", t, { shouldValidate: true })}
-    />,
-  ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ProgressStepBar totalPage={totalPage} currentPage={pageIndex + 1} />
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.header}>
+        <Text style={styles.subtitle}>
+          당신과 딱 맞는 동행을 위해{`\n`}여행 스타일을 알려주세요
+        </Text>
+      </View>
 
-      {pageIndex + 1 !== totalPage && (
-        <View style={styles.headerContainer}>
-          <Text style={styles.headerText}>
-            당신과 딱 맞는 동행을 위해 여행 설문을 시작할게요
-          </Text>
-        </View>
-      )}
-
-      <PagerView
-        ref={pagerRef}
-        style={styles.pager}
-        initialPage={0}
-        scrollEnabled={false}
-        onPageSelected={(e) => setPageIndex(e.nativeEvent.position)}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
       >
-        {pages.map((Page, idx) => (
-          <View key={idx} style={styles.page}>
-            {Page}
-          </View>
-        ))}
-      </PagerView>
+        <SingleSelectSection
+          title="⚡ 에너지 레벨"
+          options={energyLevel}
+          value={energy}
+          onChange={setEnergy}
+        />
+
+        <SingleSelectSection
+          title="🎯 여행 목적"
+          options={goal}
+          value={tripGoal}
+          onChange={setTripGoal}
+        />
+
+        <SingleSelectSection
+          title="🚀 여행 페이스"
+          options={pace}
+          value={tripPace}
+          onChange={setTripPace}
+        />
+
+        <SingleSelectSection
+          title="💬 소통 스타일"
+          options={comm}
+          value={communication}
+          onChange={setCommunication}
+        />
+
+        <SingleSelectSection
+          title="📸 기록 성향"
+          options={recordStyle}
+          value={record}
+          onChange={setRecord}
+        />
+
+        <SingleSelectSection
+          title="🤝 동행 스타일"
+          options={buddyStyle}
+          value={buddy}
+          onChange={setBuddy}
+        />
+
+        <SingleSelectSection
+          title="💰 소비 패턴"
+          options={spending}
+          value={cost}
+          onChange={setCost}
+        />
+
+        <View style={{ height: 16 }} />
+      </ScrollView>
 
       <View style={styles.buttonContainer}>
-        <CustomButton
-          label={pageIndex === totalPage - 1 ? "완료" : "다음"}
-          onPress={goNext}
-          inValid={!isStepValid()}
-        />
+        <CustomButton label="다음" inValid={!isValid} onPress={onNext} />
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
-    backgroundColor: colors.UNCHANGED_WHITE,
   },
-  headerContainer: {
+  header: {
     marginTop: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 60,
+    paddingHorizontal: 20,
+    paddingTop: 4,
+    paddingBottom: 12,
   },
-  headerText: {
-    color: colors.PRIMARY_COLOR,
+  title: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#111",
+    marginBottom: 6,
+  },
+  subtitle: {
     fontSize: 16,
-    fontWeight: "700",
+    color: "#2E7D32",
+    fontFamily: "Pretendard-Regular",
   },
-  pager: {
-    flex: 1,
-  },
-  page: {
-    flex: 1,
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
   buttonContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 20,
-    backgroundColor: colors.UNCHANGED_WHITE,
+    backgroundColor: "#FFFFFF",
   },
 });
