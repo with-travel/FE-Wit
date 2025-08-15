@@ -1,11 +1,44 @@
 import { queryClient } from "@/api/queryClient";
+import { colors } from "@/constants/colors";
 import useAuth from "@/hooks/queries/useAuth";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { useEffect } from "react";
 import "react-native-reanimated";
-import Toast from "react-native-toast-message";
+import Toast, {
+  BaseToast,
+  BaseToastProps,
+  ErrorToast,
+} from "react-native-toast-message";
+
+const toastConfig = {
+  success: (props: BaseToastProps) => (
+    <BaseToast
+      {...props}
+      style={{ borderLeftColor: colors.BLUE_500 }}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1Style={{
+        fontSize: 14,
+      }}
+      text2Style={{
+        fontSize: 12,
+      }}
+    />
+  ),
+  error: (props: BaseToastProps) => (
+    <ErrorToast
+      {...props}
+      style={{ borderLeftColor: colors.RED_500 }}
+      text1Style={{
+        fontSize: 14,
+      }}
+      text2Style={{
+        fontSize: 12,
+      }}
+    />
+  ),
+};
 
 export default function RootLayout() {
   const [loaded] = useFonts({
@@ -20,7 +53,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <RootNavigator />
-      <Toast />
+      <Toast config={toastConfig} />
     </QueryClientProvider>
   );
 }
@@ -29,6 +62,7 @@ function RootNavigator() {
   const { auth } = useAuth();
 
   useEffect(() => {
+    console.log("auth", auth);
     auth.id &&
       Toast.show({
         type: "success",
