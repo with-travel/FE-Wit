@@ -86,7 +86,13 @@ export default function AuthLayout() {
         <Stack.Screen
           name="travelform"
           options={{
-            headerShown: false,
+            headerShown: true,
+            headerTitle: "여행 설문",
+            headerLeft: () => (
+              <Pressable onPress={() => router.back()}>
+                <AntDesign name="left" size={24} color="black" />
+              </Pressable>
+            ),
           }}
         />
       </Stack>
