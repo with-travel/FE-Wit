@@ -1,5 +1,9 @@
-import { Stack } from "expo-router";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { router, Stack } from "expo-router";
 import { FormProvider, useForm } from "react-hook-form";
+import AntDesign from "@expo/vector-icons/AntDesign";
+import { Pressable } from "react-native";
+import { colors } from "@/constants/colors";
 
 type AuthForm = {
   oAuthId: string;
@@ -24,9 +28,57 @@ export default function AuthLayout() {
 
   return (
     <FormProvider {...form}>
-      <Stack>
+      <Stack
+        screenOptions={{
+          contentStyle: {
+            backgroundColor: colors.UNCHANGED_WHITE,
+          },
+        }}
+      >
         <Stack.Screen
           name="index"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="kakaologin"
+          options={{
+            headerShown: true,
+            headerTitle: "",
+            headerLeft: () => (
+              <Pressable>
+                <AntDesign name="left" size={24} color="black" />
+              </Pressable>
+            ),
+          }}
+        />
+        <Stack.Screen
+          name="serverlogin"
+          options={{
+            headerShown: true,
+            headerTitle: "로그인",
+            headerLeft: () => (
+              <Pressable onPress={() => router.back()}>
+                <AntDesign name="left" size={24} color="black" />
+              </Pressable>
+            ),
+          }}
+        />
+        <Stack.Screen
+          name="serversignup"
+          options={{
+            headerShown: true,
+            headerTitle: "회원가입",
+            headerLeft: () => (
+              <Pressable onPress={() => router.back()}>
+                <AntDesign name="left" size={24} color="black" />
+              </Pressable>
+            ),
+          }}
+        />
+        <Stack.Screen
+          name="extrainfo"
           options={{
             headerShown: false,
           }}
