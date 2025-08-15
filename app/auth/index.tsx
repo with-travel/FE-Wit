@@ -6,11 +6,12 @@ import {
   Pressable,
   StyleSheet,
   Dimensions,
+  View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useRouter } from "expo-router";
+import { router } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { postLogin } from "@/api/auth";
+import CustomButton from "@/components/CustomButton";
 
 const { width, height } = Dimensions.get("window");
 
@@ -18,6 +19,14 @@ export default function AuthHomeScreen() {
   const handleKakaoLogin = async () => {
     // router.push("/auth/kakaologin");
     router.push("/auth/extrainfo");
+  };
+
+  const handleServerLogin = () => {
+    router.push("/auth/serverlogin");
+  };
+
+  const handleServerSignup = () => {
+    router.push("/auth/serversignup");
   };
 
   return (
@@ -51,6 +60,16 @@ export default function AuthHomeScreen() {
           <Ionicons name="chatbubble-sharp" color={"#181500"} size={20} />
           <Text style={styles.kakaoText}>카카오톡으로 시작하기</Text>
         </Pressable>
+        <View style={styles.serverLoginButton}>
+          <CustomButton label="서버 로그인" onPress={handleServerLogin} />
+        </View>
+        <View style={styles.serverLoginButton}>
+          <CustomButton
+            variant="outlined"
+            label="서버 회원가입"
+            onPress={handleServerSignup}
+          />
+        </View>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -90,5 +109,8 @@ const styles = StyleSheet.create({
     color: "#000000",
     fontSize: 20,
     fontWeight: "500",
+  },
+  serverLoginButton: {
+    paddingHorizontal: 20,
   },
 });
